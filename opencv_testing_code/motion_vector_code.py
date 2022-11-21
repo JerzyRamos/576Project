@@ -45,6 +45,14 @@ for i in range(frames):
 frame1 = imgs[0]
 prvs = cv.cvtColor(frame1, cv.COLOR_BGR2GRAY)
 
+motion_list = []
+mag_list = []
+ang_list = []
+subsampled_motion_list = []
+subsampled_mag_list = []
+subsampled_ang_list = []
+
+
 for i in range(1, frames):
     next = cv.cvtColor(imgs[i], cv.COLOR_BGR2GRAY)
     # motion is the motion vector of each pixel in the frame
@@ -59,6 +67,14 @@ for i in range(1, frames):
     subsampled_motion = subsample(motion, size)
     subsampled_ang = subsample(ang, size)
     subsampled_mag = subsample(mag, size)
+
+    # store all data in lists
+    motion_list.append(motion)
+    mag_list.append(mag)
+    ang_list.append(ang)
+    subsampled_motion_list.append(subsampled_motion)
+    subsampled_mag_list.append(subsampled_mag)
+    subsampled_ang_list.append(subsampled_ang)
 
 
     # code for displaying the frames
