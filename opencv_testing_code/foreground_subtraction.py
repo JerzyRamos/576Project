@@ -22,7 +22,7 @@ def subsample(arr, size=16):
 
 
 imgs = []
-foldername = "Stairs_490_270_346"
+foldername = "SAL_490_270_437"
 nums = foldername.split("_")
 width = int(nums[1])
 height = int(nums[2])
@@ -37,8 +37,9 @@ prvs = cv.cvtColor(frame1, cv.COLOR_BGR2GRAY)
 hsv = np.zeros_like(frame1)
 hsv[..., 1] = 255
 
-foreground_elements = []
-# TODO - use neighboring frames for comparison of shape, continous shape numbering
+foreground_frames = []
+background_frames = []
+# TODO - use neighboring frames for comparison of shape, continuous shape numbering
 # thoughts
 # use variable f to control number of frames on either side, like f=2 -> 2+f+2
 # if black block all exists, then average all five, every block above quantile_threshold will exist
@@ -47,23 +48,15 @@ for i in range(1, frames):
     next = cv.cvtColor(imgs[i], cv.COLOR_BGR2GRAY)
     motion = cv.calcOpticalFlowFarneback(prvs, next, None, 0.5, 3, 16, 3, 5, 0.5, 1)
     # mag, ang = cv.cartToPolar(motion[..., 0], motion[..., 1], angleInDegrees=True)
-    # ang = ang.reshape(-1, 10, ang.shape[1]).mean(axis = 1)
     size = 16
     subsampled_motion = subsample(motion, size)
     subsampled_mag, subsampled_ang = cv.cartToPolar(subsampled_motion[..., 0], subsampled_motion[..., 1], angleInDegrees=True)
-    print(subsampled_ang.shape)
     subsampled_ang = subsampled_ang / 72
     m, n = subsampled_ang.shape
     u, c = np.unique(subsampled_ang.round(), return_counts=True)
     most_common_ang = u[c.argmax()]
-    # c.sort()
-    print("most: ",subsampled_ang)
-    print(u)
-    print("--")
-    print(c)
     u, c = np.unique(subsampled_mag.round(1), return_counts=True)
     most_common_mag = u[c.argmax()]
-    # diff_area = np.argwhere(min(abs(subsampled_ang - most_common_ang),abs(10 - subsampled_ang - most_common_ang)) > 0.6)
     diff_area = []
     for x in range(m):
         for y in range(n):
@@ -120,8 +113,8 @@ for i in range(1, frames):
                     # stack.append((u - 1, v - 1))
 
         if area > 0:
-            if len(coord) > 0:
-                shapes[total_shapes] = coord
+            if len(coord) > 2:
+                shapes[total_shapes] = visited
                 total_shapes += 1
 
     # render only top objects
@@ -138,6 +131,7 @@ for i in range(1, frames):
     # foreground_frame = np.full((len(imgs[i]), len(imgs[i][0]), 3), 255)
 
     foreground_frame = np.full_like(imgs[i], 255)
+    background_frame = imgs[i].copy()
     for shape in shapes.values():
         if len(shape) > 0:
             for x, y in shape:
@@ -148,6 +142,7 @@ for i in range(1, frames):
                         if y * size + b == len(imgs[i][0]):
                             break
                         foreground_frame[x * size + a][y * size + b] = imgs[i][x * size + a][y * size + b]
+                        background_frame[x * size + a][y * size + b] = [0, 0, 0]
 
 
     # for rendering diff_area directly
@@ -180,7 +175,8 @@ for i in range(1, frames):
     #                 if y * size + b == len(imgs[i][0]):
     #                     break
     #                 hsv[x * size + a][y * size + b][0] = subsampled_ang[x][y]*36
-
+    foreground_frames.append(foreground_frame)
+    background_frames.append(background_frame)
 
     # hsv[..., 0] = ang.round() * 36
     hsv[..., 2] = 155
