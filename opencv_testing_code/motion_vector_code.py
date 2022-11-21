@@ -12,21 +12,14 @@ def readRGB(path, filename, width, height):
 
 
 def subsample(arr, size=16):
-    row, col = arr.shape[0], arr.shape[1]
+    row, col, depth = arr.shape
     n_row = (row - 1) // size + 1
     n_col = (col - 1) // size + 1
-    if len(arr.shape) == 3:
-        d = arr.shape[2]
-        n = np.zeros((n_row, n_col,d))
-        for i in range(n_row):
-            for j in range(n_col):
-                for k in range(d):
-                    n[i][j][k] = np.mean([x[k] for x in arr[i * size:(i + 1) * size:, j * size:(j + 1) * size:]])
-    else:
-        n = np.zeros((n_row, n_col))
-        for i in range(n_row):
-            for j in range(n_col):
-                n[i][j] = arr[i * size:(i + 1) * size:, j * size:(j + 1) * size:].mean()
+    n = np.zeros((n_row, n_col,depth))
+    for i in range(n_row):
+        for j in range(n_col):
+            for k in range(depth):
+                n[i][j][k] = arr[i * size:(i + 1) * size:, j * size:(j + 1) * size:,k].mean()
     return n
 
 
@@ -65,8 +58,7 @@ for i in range(1, frames):
     # use 'size' to control the height/width in pixels of each motion vector block
     size = 16
     subsampled_motion = subsample(motion, size)
-    subsampled_ang = subsample(ang, size)
-    subsampled_mag = subsample(mag, size)
+    subsampled_mag, subsampled_ang = cv.cartToPolar(subsampled_motion[..., 0], subsampled_motion[..., 1])
 
     # store all data in lists
     motion_list.append(motion)
