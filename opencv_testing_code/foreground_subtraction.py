@@ -22,7 +22,7 @@ def subsample(arr, size=16):
 
 
 imgs = []
-foldername = "SAL_490_270_437"
+foldername = "Stairs_490_270_346"
 nums = foldername.split("_")
 width = int(nums[1])
 height = int(nums[2])
@@ -60,28 +60,10 @@ for i in range(1, frames):
     diff_area = []
     for x in range(m):
         for y in range(n):
-            if min(abs(subsampled_ang[x][y] - most_common_ang), abs(5 - subsampled_ang[x][y] - most_common_ang)) > 0.5:
+            if min(abs(subsampled_ang[x][y] - most_common_ang), abs(5 - subsampled_ang[x][y] - most_common_ang)) > 0.4:
+                # TODO - Try to include magnitude difference into segmentation
+                # abs(subsampled_mag[x][y]-most_common_mag)>2:
                 diff_area.append((x,y))
-
-
-    # diff_area = np.argwhere(abs(subsampled_mag-most_common_mag)>0.85)
-    # for x,y in diff_area:
-    #     for a in range(size):
-    #         if x*size+a == len(imgs[i]):
-    #             break
-    #         for b in range(size):
-    #             if y*size+b == len(imgs[i][0]):
-    #                 break
-    #             imgs[i][x*size+a][y*size+b] = [255,255,255]
-    # diff_area = np.argwhere(abs(subsampled_ang-most_common_ang)>0.7)
-    # for x,y in diff_area:
-    #     for a in range(size):
-    #         if x*size+a == len(imgs[i]):
-    #             break
-    #         for b in range(size):
-    #             if y*size+b == len(imgs[i][0]):
-    #                 break
-    #             imgs[i][x*size+a][y*size+b] = [0,0,0]
 
     # get contiguous shapes from diff_area
     matrix = np.zeros_like(subsampled_ang)
@@ -114,50 +96,17 @@ for i in range(1, frames):
 
         if area > 0:
             if len(coord) > 2:
-                shapes[total_shapes] = visited
+                shapes[total_shapes] = coord
                 total_shapes += 1
-
-    # render only top objects
-    # if shapes.values():
-    #     largest_shape = max(shapes.values(), key=len)
-    #     for x,y in largest_shape    :
-    #         for a in range(size):
-    #             if x*size+a == len(imgs[i]):
-    #                 break
-    #             for b in range(size):
-    #                 if y*size+b == len(imgs[i][0]):
-    #                     break
-    #                 imgs[i][x*size+a][y*size+b] = [0,0,0]
-    # foreground_frame = np.full((len(imgs[i]), len(imgs[i][0]), 3), 255)
 
     foreground_frame = np.full_like(imgs[i], 255)
     background_frame = imgs[i].copy()
     for shape in shapes.values():
         if len(shape) > 0:
             for x, y in shape:
-                for a in range(size):
-                    if x * size + a == len(imgs[i]):
-                        break
-                    for b in range(size):
-                        if y * size + b == len(imgs[i][0]):
-                            break
-                        foreground_frame[x * size + a][y * size + b] = imgs[i][x * size + a][y * size + b]
-                        background_frame[x * size + a][y * size + b] = [0, 0, 0]
+                foreground_frame[x * size:(x+1)*size, y*size:(y+1)*size] = imgs[i][x*size:(x+1)*size,y*size:(y+1)*size]
+                background_frame[x * size:(x+1)*size, y*size:(y+1)*size] = [0, 0, 0]
 
-
-    # for rendering diff_area directly
-    # foreground_frame = np.full_like(imgs[i], 255)
-    # for x, y in diff_area:
-    #     for a in range(size):
-    #         if x * size + a == len(imgs[i]):
-    #             break
-    #         for b in range(size):
-    #             if y * size + b == len(imgs[i][0]):
-    #                 break
-    #             foreground_frame[x * size + a][y * size + b] = imgs[i][x * size + a][y * size + b]
-
-    # for x in range(len(mask)):
-    #     for y in range(len(mask[0])):
 
     # TODO - idea
     # compare each region with the frame before(maybe 2 to be safe)
@@ -165,23 +114,12 @@ for i in range(1, frames):
     # region may terminate, or new ones will begin
     # in the end will receive each object number and frame data.
 
-    # for rendering subsampled_ang
-    # for x in range(m):
-    #     for y in range(n):
-    #         for a in range(size):
-    #             if x * size + a == len(imgs[i]):
-    #                 break
-    #             for b in range(size):
-    #                 if y * size + b == len(imgs[i][0]):
-    #                     break
-    #                 hsv[x * size + a][y * size + b][0] = subsampled_ang[x][y]*36
     foreground_frames.append(foreground_frame)
     background_frames.append(background_frame)
 
-    # hsv[..., 0] = ang.round() * 36
-    hsv[..., 2] = 155
-    bgr = cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
-    cv.imshow('frame', foreground_frame)
+    # hsv[..., 2] = 155
+    # bgr = cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
+    cv.imshow('frame', background_frame)
     cv.setWindowProperty('frame', cv.WND_PROP_TOPMOST, 1)
     k = cv.waitKey(30) & 0xff
     # print(i)
@@ -190,6 +128,6 @@ for i in range(1, frames):
         break
     elif k == ord('s'):
         cv.imwrite('opticalfb.png', imgs[i])
-        cv.imwrite('opticalhsv.png', bgr)
+        # cv.imwrite('opticalhsv.png', bgr)
     prvs = next
 cv.destroyAllWindows()
