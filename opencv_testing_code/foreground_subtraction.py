@@ -1,3 +1,4 @@
+from collections import defaultdict
 import numpy as np
 import cv2 as cv
 
@@ -20,9 +21,20 @@ def subsample(arr, size=16):
                 n[i][j][k] = arr[i * size:(i + 1) * size:, j * size:(j + 1) * size:,k].mean()
     return n
 
+# change args to use preset values for different videos
+
+# args = ["SAL_490_270_437", 1.1, 5, 0, 4]
+args = ["Stairs_490_270_346", 0.4, 5, 0, 4]
+foldername = args[0]
+ang_threshold = args[1]
+nearest_frames = args[2]
+quantile_threshold = args[3]
+min_shape_threshold = args[4]
+
+print("Program started")
 
 imgs = []
-foldername = "Stairs_490_270_346"
+
 nums = foldername.split("_")
 width = int(nums[1])
 height = int(nums[2])
@@ -39,12 +51,22 @@ hsv[..., 1] = 255
 
 foreground_frames = []
 background_frames = []
+# frame_shapes = []
+# frame_shapes_dict = []
+frame_masks = []
 # TODO - use neighboring frames for comparison of shape, continuous shape numbering
 # thoughts
 # use variable f to control number of frames on either side, like f=2 -> 2+f+2
 # if black block all exists, then average all five, every block above quantile_threshold will exist
 # TODO - better feathering of shape?
-for i in range(1, frames):
+print("Frames processing started")
+for i in range(1, len(imgs)):
+    if i == len(imgs)//4:
+        print("Processing 25% done")
+    elif i == len(imgs)//2:
+        print("Processing 50% done")
+    elif i == len(imgs)//4*3:
+        print("Processing 75% done")
     next = cv.cvtColor(imgs[i], cv.COLOR_BGR2GRAY)
     motion = cv.calcOpticalFlowFarneback(prvs, next, None, 0.5, 3, 16, 3, 5, 0.5, 1)
     # mag, ang = cv.cartToPolar(motion[..., 0], motion[..., 1], angleInDegrees=True)
@@ -55,79 +77,104 @@ for i in range(1, frames):
     m, n = subsampled_ang.shape
     u, c = np.unique(subsampled_ang.round(), return_counts=True)
     most_common_ang = u[c.argmax()]
-    u, c = np.unique(subsampled_mag.round(1), return_counts=True)
-    most_common_mag = u[c.argmax()]
-    diff_area = []
+    # u, c = np.unique(subsampled_mag.round(1), return_counts=True)
+    # most_common_mag = u[c.argmax()]
+
+
+    # diff_area = []
+    mask = np.zeros_like(subsampled_ang)
+    
     for x in range(m):
         for y in range(n):
-            if min(abs(subsampled_ang[x][y] - most_common_ang), abs(5 - subsampled_ang[x][y] - most_common_ang)) > 0.4:
+            if min(abs(subsampled_ang[x][y] - most_common_ang), abs(5 - subsampled_ang[x][y] - most_common_ang)) > ang_threshold:
                 # TODO - Try to include magnitude difference into segmentation
                 # abs(subsampled_mag[x][y]-most_common_mag)>2:
-                diff_area.append((x,y))
+                # diff_area.append((x,y))
+                mask[x][y] = 1
+
+    frame_masks.append(mask)
+
+
+    prvs = next
+
+# cv.destroyAllWindows()
+# # check f neighbors both ways for each frame
+# f = 5
+# for i in range(f, len(foreground_frames)-f):
+#     # if most empty, leave empty
+#     # if few empty, ignore empty ones
+#     for shape in frame_shapes[i]:
+#         quantile_dict = defaultdict(int)
+#         px, py = shape[0]
+#         for frame in range(i-f,i+f):
+#             if frame == i:
+#                 continue
+#             cur_shape = shapes_dict[i][(px,py)]
+#             # got shape and cur_shape for comparison
+
+for i in range(len(imgs)):
+    matrix = np.mean(frame_masks[max(0,i-nearest_frames):i+nearest_frames], axis=0)
+    # for x in range(len(m)):
+    #     for y in range(len(m[0])):
+    #         if m[x][y] > 0:
+    #             ff[x * size:(x+1)*size, y*size:(y+1)*size] = imgs[i][x*size:(x+1)*size,y*size:(y+1)*size]
+    
 
     # get contiguous shapes from diff_area
-    matrix = np.zeros_like(subsampled_ang)
     total_shapes = 0
-    for x, y in diff_area:
-        matrix[x][y] = 1
-
-
     shapes = {}
-
-    for x, y in diff_area:
-        stack = [(x, y)]
-        area = 0
-        coord = set()
-        visited = set()
-        while stack:
-            u, v = stack.pop()
-            if 0 <= u < m and 0 <= v < n and (u, v) not in visited:
-                visited.add((u, v))
-                if matrix[u][v] == 1:
-                    area += 1
-                    coord.add((u, v))
-                    stack.append((u - 1, v))
-                    stack.append((u + 1, v))
-                    stack.append((u, v - 1))
-                    # stack.append((u + 1, v + 1))
-                    # stack.append((u + 1, v - 1))
-                    # stack.append((u - 1, v + 1))
-                    # stack.append((u - 1, v - 1))
-
-        if area > 0:
-            if len(coord) > 2:
-                shapes[total_shapes] = coord
-                total_shapes += 1
+    m,n = frame_masks[i].shape
+    for x in range(m):
+        for y in range(n):
+            if matrix[x][y] == 0:
+                continue
+            stack = [(x, y)]
+            area = 0
+            coord = set()
+            visited = set()
+            while stack:
+                u, v = stack.pop()
+                if 0 <= u < m and 0 <= v < n and (u, v) not in visited:
+                    visited.add((u, v))
+                    if matrix[u][v] > quantile_threshold:
+                        area += 1
+                        coord.add((u, v))
+                        stack.append((u - 1, v))
+                        stack.append((u + 1, v))
+                        stack.append((u, v - 1))
+                        # stack.append((u + 1, v + 1))
+                        # stack.append((u + 1, v - 1))
+                        # stack.append((u - 1, v + 1))
+                        # stack.append((u - 1, v - 1))
+            if area > 0:
+                if len(coord) > 2:
+                    shapes[total_shapes] = coord
+                    total_shapes += 1
 
     foreground_frame = np.full_like(imgs[i], 255)
     background_frame = imgs[i].copy()
+    shapes_dict = {}
     for shape in shapes.values():
-        if len(shape) > 0:
+        if len(shape) > min_shape_threshold:
             for x, y in shape:
+                shapes_dict[(x,y)]=shape
                 foreground_frame[x * size:(x+1)*size, y*size:(y+1)*size] = imgs[i][x*size:(x+1)*size,y*size:(y+1)*size]
                 background_frame[x * size:(x+1)*size, y*size:(y+1)*size] = [0, 0, 0]
 
 
-    # TODO - idea
-    # compare each region with the frame before(maybe 2 to be safe)
-    # same/similar regions will be inherit number throughout the video
-    # region may terminate, or new ones will begin
-    # in the end will receive each object number and frame data.
-
+    # frame_shapes.append(shapes)
+    # frame_shapes_dict.append(shapes_dict)
     foreground_frames.append(foreground_frame)
     background_frames.append(background_frame)
 
-    # hsv[..., 2] = 155
-    # bgr = cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
-    cv.imshow('frame', background_frame)
+
+
+    cv.imshow('frame', foreground_frame)
     cv.setWindowProperty('frame', cv.WND_PROP_TOPMOST, 1)
     k = cv.waitKey(30) & 0xff
-    # print(i)
-    # k = cv.waitKey(0)
     if k == 27:
         break
-    elif k == ord('s'):
-        cv.imwrite('opticalfb.png', imgs[i])
-        # cv.imwrite('opticalhsv.png', bgr)
-    prvs = next
+
+
+# new approach directly compare frames and take average
 cv.destroyAllWindows()
