@@ -54,14 +54,7 @@ hsv[..., 1] = 255
 
 foreground_frames = []
 background_frames = []
-# frame_shapes = []
-# frame_shapes_dict = []
 frame_masks = []
-# TODO - use neighboring frames for comparison of shape, continuous shape numbering
-# thoughts
-# use variable f to control number of frames on either side, like f=2 -> 2+f+2
-# if black block all exists, then average all five, every block above quantile_threshold will exist
-# TODO - better feathering of shape?
 print("Frames processing started")
 for i in range(1, len(imgs)):
     if i == len(imgs) // 4:
@@ -71,29 +64,26 @@ for i in range(1, len(imgs)):
     elif i == len(imgs) // 4 * 3:
         print("Processing 75% done")
     nxt = cv.cvtColor(imgs[i], cv.COLOR_BGR2GRAY)
+
+    # this is the cv library that computes the optical flow(motion vectors) between two frames
     motion = cv.calcOpticalFlowFarneback(prvs, nxt, None, 0.5, 3, 16, 3, 5, 0.5, 1)
-    # mag, ang = cv.cartToPolar(motion[..., 0], motion[..., 1], angleInDegrees=True)
     size = 16
     subsampled_motion = subsample(motion, size)
     subsampled_mag, subsampled_ang = cv.cartToPolar(subsampled_motion[..., 0], subsampled_motion[..., 1],
                                                     angleInDegrees=True)
+    # the motion angles extracted from the vectors are values in 360 degrees
+    # dividing them by 72 partitions them into 5 segments for finding the background(most common) motion angle
     subsampled_ang = subsampled_ang / 72
     m, n = subsampled_ang.shape
     u, c = np.unique(subsampled_ang.round(), return_counts=True)
     most_common_ang = u[c.argmax()]
-    # u, c = np.unique(subsampled_mag.round(1), return_counts=True)
-    # most_common_mag = u[c.argmax()]
-
-    # diff_area = []
     mask = np.zeros_like(subsampled_ang)
 
+    # this loop filters out foreground objects by comparing against the most common angle
     for x in range(vertical_edge_buffer, m-vertical_edge_buffer):
         for y in range(horizontal_edge_buffer, n-horizontal_edge_buffer):
             if min(abs(subsampled_ang[x][y] - most_common_ang),
                    abs(5 - subsampled_ang[x][y] - most_common_ang)) > ang_threshold:
-                # TODO - Try to include magnitude difference into segmentation
-                # abs(subsampled_mag[x][y]-most_common_mag)>2:
-                # diff_area.append((x,y))
                 mask[x][y] = 1
     frame_masks.append(mask)
     prvs = nxt
@@ -102,12 +92,12 @@ video = cv.VideoWriter('foreground_video.mp4',cv.VideoWriter_fourcc(*'mp4v'), 20
 
 for i in range(len(imgs)-1):
     matrix = np.mean(frame_masks[max(0, i - nearest_frames):i + nearest_frames], axis=0)
-    # frame_masks[i] = np.zeros(frame_masks[i].shape)
-    # get contiguous shapes from diff_area
     total_shapes = 0
     shapes = {}
     m, n = frame_masks[i].shape
 
+
+    # this loop uses bfs to find all contiguous shapes and discards small moving segments
     for x in range(m):
         for y in range(n):
             if matrix[x][y] == 0:
@@ -121,21 +111,17 @@ for i in range(len(imgs)-1):
                 if 0 <= u < m and 0 <= v < n and (u, v) not in visited:
                     visited.add((u, v))
                     if matrix[u][v] > quantile_threshold:
-                        # frame_masks[i][u][v] = 1
                         area += 1
                         coord.add((u, v))
                         stack.append((u - 1, v))
                         stack.append((u + 1, v))
                         stack.append((u, v - 1))
-                        # stack.append((u + 1, v + 1))
-                        # stack.append((u + 1, v - 1))
-                        # stack.append((u - 1, v + 1))
-                        # stack.append((u - 1, v - 1))
             if area > 0:
                 if len(coord) > 2:
                     shapes[total_shapes] = coord
                     total_shapes += 1
 
+    # this step upscales the foreground mask and produces the foreground object frame and the background frame with objected removed
     foreground_frame = np.full_like(imgs[i], 255)
     background_frame = imgs[i].copy()
     shapes_dict = {}
@@ -147,8 +133,6 @@ for i in range(len(imgs)-1):
                                                                                      y * size:(y + 1) * size]
                 background_frame[x * size:(x + 1) * size, y * size:(y + 1) * size] = [0, 0, 0]
 
-    # frame_shapes.append(shapes)
-    # frame_shapes_dict.append(shapes_dict)
     foreground_frames.append(foreground_frame)
     background_frames.append(background_frame)
 
@@ -159,6 +143,5 @@ for i in range(len(imgs)-1):
         break
     video.write(foreground_frame)
 
-# new approach directly compare frames and take average
 video.release()
 cv.destroyAllWindows()
