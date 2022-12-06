@@ -24,8 +24,8 @@ def subsample(arr, size=16):
 
 def get_foreground_background_frames(play_video_window=False):
     # change args to use preset values for different videos
-    # args = ["SAL_490_270_437", 1.1, 5, 0, 4, 2, 2]
-    # args = ["Stairs_490_270_346", 0.4, 15, 0, 8, 5, 0]
+    # args = ["SAL_490_270_437", 1.1, 5, 0, 4, [2, 2, 2, 2]]
+    # args = ["Stairs_490_270_346", 0.4, 15, 0, 8, [5, 5, 0, 0]]
     # args = ["test1_480_270_404", 0.6, 45, 0.1, 1, [5, 1, 9,12]]
     # args = ["test2_480_270_631", 0.7, 25, 0.1, 1, [6, 1, 0, 3]]
     args = ["test3_480_270_595", 0.6, 45, 0.2, 6, [5, 3, 6, 6]]
@@ -67,6 +67,7 @@ def get_foreground_background_frames(play_video_window=False):
     background_frames = []
     frame_masks = []
     object_shapes = []
+    final_frame_masks = []
     # TODO - better feathering of shape?
     print("Frames processing started")
     for i in range(1, len(imgs)):
@@ -108,6 +109,7 @@ def get_foreground_background_frames(play_video_window=False):
         total_shapes = 0
         shapes = {}
         m, n = frame_masks[i].shape
+        final_frame_mask = np.zeros((m,n))
 
         # this loop uses bfs to find all contiguous shapes and discards small moving segments
         for x in range(m):
@@ -123,6 +125,7 @@ def get_foreground_background_frames(play_video_window=False):
                     if 0 <= u < m and 0 <= v < n and (u, v) not in visited:
                         visited.add((u, v))
                         if matrix[u][v] > quantile_threshold:
+                            final_frame_mask[u][v] = 1
                             # frame_masks[i][u][v] = 1
                             area += 1
                             coord.add((u, v))
@@ -152,6 +155,7 @@ def get_foreground_background_frames(play_video_window=False):
 
         foreground_frames.append(foreground_frame)
         background_frames.append(background_frame)
+        final_frame_masks.append(final_frame_mask)
         object_shapes.append(shapes)
         if play_video_window:
             cv.imshow('frame', foreground_frame)
@@ -163,9 +167,9 @@ def get_foreground_background_frames(play_video_window=False):
 
     video.release()
     print("finished segmentation\n")
-    return foreground_frames, background_frames, object_shapes
+    return foreground_frames, background_frames, object_shapes, final_frame_masks
 
 
 if __name__ == '__main__':
     # play_video_window is set to True here to display video as rendering for debug purposes
-    foreground_frames, background_frames, object_shapes = get_foreground_background_frames(True)
+    foreground_frames, background_frames, object_shapes, final_frame_masks = get_foreground_background_frames(True)
