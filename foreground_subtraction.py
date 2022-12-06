@@ -60,15 +60,14 @@ def get_foreground_background_frames(play_video_window=False):
 
     frame1 = imgs[0]
     prvs = cv.cvtColor(frame1, cv.COLOR_BGR2GRAY)
-    hsv = np.zeros_like(frame1)
-    hsv[..., 1] = 255
+    # hsv = np.zeros_like(frame1)
+    # hsv[..., 1] = 255
 
     foreground_frames = []
     background_frames = []
     frame_masks = []
     object_shapes = []
     final_frame_masks = []
-    # TODO - better feathering of shape?
     print("Frames processing started")
     for i in range(1, len(imgs)):
         if i == len(imgs) // 4:
@@ -109,7 +108,8 @@ def get_foreground_background_frames(play_video_window=False):
         total_shapes = 0
         shapes = {}
         m, n = frame_masks[i].shape
-        final_frame_mask = np.zeros((m,n))
+        print(frame_masks[i].shape)
+        final_frame_mask = np.zeros((height, width))
 
         # this loop uses bfs to find all contiguous shapes and discards small moving segments
         for x in range(m):
@@ -125,7 +125,7 @@ def get_foreground_background_frames(play_video_window=False):
                     if 0 <= u < m and 0 <= v < n and (u, v) not in visited:
                         visited.add((u, v))
                         if matrix[u][v] > quantile_threshold:
-                            final_frame_mask[u][v] = 1
+                            final_frame_mask[u * size:(u + 1) * size][v * size:(v + 1) * size] = 1
                             # frame_masks[i][u][v] = 1
                             area += 1
                             coord.add((u, v))
