@@ -22,12 +22,12 @@ from foreground_subtraction import get_foreground_background_frames
 # min number of match points
 MIN_MATCH_COUNT = 4
 # the cadence of frames we use to generate panorama
-N = 5
+N = 8
 # min missing pixel count we use in the filling missing pixel processs. We stop searching if the missing pixel count is less than this number.
 MIN_MISSING_PIXEL_COUNT = 50
 
 # used to stop while loop earlier for faster processing
-STOP_SEARCH_COUNT = 10
+STOP_SEARCH_COUNT = 180
 
 
 # def display_frames(frame_list):
@@ -169,7 +169,7 @@ def get_inverse_homography_matrices(homography_matrices):
 
 
 def main():
-    _, background_frames, object_shapes, final_frame_masks = get_foreground_background_frames()
+    _, background_frames, object_shapes, final_frame_masks, _ = get_foreground_background_frames()
     homography_matrices = get_homography_matrices(background_frames)
     inverse_homography_matrices = get_inverse_homography_matrices(homography_matrices)
     filled_background_frames = []

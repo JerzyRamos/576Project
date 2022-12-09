@@ -1,3 +1,6 @@
+"""
+An edited version of foreground_subtraction tailored for generate_motion_trail.py
+"""
 from collections import defaultdict
 import numpy as np
 import cv2 as cv
@@ -147,10 +150,6 @@ def get_foreground_background_frames(play_video_window=False):
                     u, v = stack.pop()
                     if 0 <= u < m and 0 <= v < n and (u, v) not in visited:
                         visited.add((u, v))
-                        if u > 1:
-                            visited.add((u - 2, v))
-                        if u < m - 1:
-                            visited.add((u + 1, v))
                         if matrix[u][v] > quantile_threshold:
                             area += 1
                             coord.add((u, v))
@@ -167,7 +166,7 @@ def get_foreground_background_frames(play_video_window=False):
         foreground_frame = np.full_like(imgs[i], 255)
         background_frame = imgs[i].copy()
         shapes_dict = {}
-        final_frame_mask = np.full((imgs[i].shape[0], imgs[i].shape[1]), 255, np.uint8)
+        final_frame_mask = np.full((imgs[i].shape[0], imgs[i].shape[1]), 0, np.uint8)
         for shape in shapes.values():
             if len(shape) > min_shape_threshold:
                 for x, y in shape:
@@ -176,7 +175,7 @@ def get_foreground_background_frames(play_video_window=False):
                                                                                          y * size:(y + 1) * size]
                     background_frame[x * size:(x + 1) * size, y * size:(y + 1) * size] = [0, 0, 0]
                     final_frame_mask[x * size:(x + 1) * size,
-                               y * size:(y + 1) * size] = 0
+                               y * size:(y + 1) * size] = 255
         foreground_frames.append(foreground_frame)
         background_frames.append(background_frame)
         final_frame_masks.append(final_frame_mask)
